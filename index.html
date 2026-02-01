@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Happy Birthday Aunt Ellie!</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #7EC850; /* Grassy Green */
+            font-family: 'Nunito', sans-serif;
+            touch-action: none; /* Prevent scroll on mobile */
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            text-shadow: 2px 2px 0px rgba(0,0,0,0.2);
+            pointer-events: auto;
+        }
+
+        h1 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 2.5rem;
+            margin: 0;
+            color: #FFD700;
+            -webkit-text-stroke: 1.5px #D35400;
+        }
+
+        p {
+            font-size: 1.2rem;
+            margin: 5px 0 0 0;
+            font-weight: bold;
+        }
+
+        #score-board {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: inline-block;
+            margin-top: 10px;
+            border: 3px solid #FF8C00;
+            color: #D35400;
+            font-weight: 800;
+            font-size: 1.5rem;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1rem;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+        }
+
+        #start-screen, #win-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            pointer-events: auto;
+            backdrop-filter: blur(5px);
+        }
+
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            max-width: 90%;
+            width: 400px;
+            border: 5px solid #FFD700;
+        }
+
+        button.btn {
+            background: #FF8C00;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 20px;
+            font-family: 'Fredoka One', cursive;
+            transition: transform 0.1s;
+            box-shadow: 0 5px 0 #D35400;
+        }
+
+        button.btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #D35400;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        /* Confetti container */
+        #confetti-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    <canvas id="confetti-canvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="header">
+            <h1>Happy Birthday Aunt Ellie!</h1>
+            <div id="score-board">Balls: <span id="score">0</span> / 10</div>
+        </div>
+        <div id="instructions">
+            Use Arrow Keys / WASD or Touch & Drag to run!
+        </div>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen">
+        <div class="card">
+            <h2 style="color: #FF8C00; font-family: 'Fredoka One'; font-size: 2rem; margin-bottom: 10px;">Hi Aunt Ellie!</h2>
+            <p style="color: #555; margin-bottom: 20px;">Winston needs your help cleaning up the yard for your party.</p>
+            <p style="color: #555; font-size: 0.9rem;">1. Run to a Tennis Ball to pick it up.<br>2. Run to the Blue Bucket to drop it in.</p>
+            <button class="btn" onclick="startGame()">Start Playing</button>
+        </div>
+    </div>
+
+    <!-- Win Screen -->
+    <div id="win-screen" class="hidden">
+        <div class="card">
+            <h2 style="color: #FF8C00; font-family: 'Fredoka One'; font-size: 2.5rem; margin-bottom: 10px;">Good Boy, Winston!</h2>
+            <p style="font-size: 1.2rem; color: #333;">The yard is clean!</p>
+            <h3 style="color: #D35400; font-family: 'Fredoka One'; margin: 20px 0;">Hope you have a<br>PAW-some Birthday!</h3>
+            <button class="btn" onclick="resetGame()">Play Again</button>
+        </div>
+    </div>
+
+<script>
+    /**
+     * Game Logic & Rendering
+     */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const startScreen = document.getElementById('start-screen');
+    const winScreen = document.getElementById('win-screen');
+    const confettiCanvas = document.getElementById('confetti-canvas');
+    const confettiCtx = confettiCanvas.getContext('2d');
+
+    // Game State
+    let gameActive = false;
+    let score = 0;
+    const totalBalls = 10;
+    let lastTime = 0;
+    
+    // Resize handling
+    let width, height;
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        confettiCanvas.width = width;
+        confettiCanvas.height = height;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Input State
+    const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+    const touchInput = { active: false, x: 0, y: 0 };
+
+    // Entities
+    const winston = {
+        x: width / 2,
+        y: height / 2,
+        size: 40,
+        speed: 5,
+        color: '#EDC9Af', // Golden/Tan
+        angle: 0,
+        hasBall: false,
+        tailAngle: 0,
+        tailSpeed: 0.2
+    };
+
+    const bucket = {
+        x: width / 2,
+        y: height / 2 - 150,
+        radius: 35,
+        color: '#3498db'
+    };
+
+    let balls = [];
+    const ballRadius = 8;
+
+    // --- Asset Drawing Functions ---
+
+    function drawGrassPattern() {
+        // Simple textured background
+        ctx.fillStyle = '#7EC850';
+        ctx.fillRect(0, 0, width, height);
+        
+        // Add some random grass blades
+        // Optimization: In a real engine we'd cache this, but for simple canvas this is fine if count is low
+        // Or we just draw simple circles/patterns. Let's keep it clean green for performance.
+    }
+
+    function drawBucket(x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // Bucket Body
+        ctx.fillStyle = '#2980b9';
+        ctx.beginPath();
+        ctx.arc(0, 0, 35, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Rim
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#ecf0f1';
+        ctx.stroke();
+
+        // Inside shading
+        ctx.fillStyle = '#1f618d';
+        ctx.beginPath();
+        ctx.arc(0, 0, 25, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText("TOYS", 0, 4);
+
+        // Highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.arc(-10, -10, 8, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function drawTennisBall(x, y) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // Ball body
+        ctx.fillStyle = '#DFFF4F'; // Tennis yellow
+        ctx.beginPath();
+        ctx.arc(0, 0, ballRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // White curve lines
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, ballRadius - 1, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawWinston(x, y, angle, hasBall) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+
+        // -- Tail --
+        // Wag the tail!
+        const wag = Math.sin(Date.now() / 100) * 0.5;
+        ctx.save();
+        ctx.translate(-25, 0); // Tail pivot
+        ctx.rotate(wag);
+        ctx.fillStyle = '#C69C6D'; // Slightly darker
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 15, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // -- Body --
+        ctx.fillStyle = '#E5B172'; // Golden fur
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 25, 12, 0, 0, Math.PI * 2); // Main body oval
+        ctx.fill();
+
+        // -- Paws --
+        ctx.fillStyle = '#C69C6D';
+        // Front Left
+        ctx.beginPath(); ctx.arc(15, -12, 5, 0, Math.PI*2); ctx.fill();
+        // Front Right
+        ctx.beginPath(); ctx.arc(15, 12, 5, 0, Math.PI*2); ctx.fill();
+        // Back Left
+        ctx.beginPath(); ctx.arc(-15, -12, 5, 0, Math.PI*2); ctx.fill();
+        // Back Right
+        ctx.beginPath(); ctx.arc(-15, 12, 5, 0, Math.PI*2); ctx.fill();
+
+        // -- Head --
+        ctx.translate(18, 0); // Move to head position
+        ctx.fillStyle = '#E5B172';
+        ctx.beginPath();
+        ctx.arc(0, 0, 14, 0, Math.PI*2);
+        ctx.fill();
+
+        // -- Ears --
+        ctx.fillStyle = '#C69C6D';
+        // Left Ear
+        ctx.beginPath();
+        ctx.ellipse(-2, -12, 8, 4, Math.PI/3, 0, Math.PI*2);
+        ctx.fill();
+        // Right Ear
+        ctx.beginPath();
+        ctx.ellipse(-2, 12, 8, 4, -Math.PI/3, 0, Math.PI*2);
+        ctx.fill();
+
+        // -- Face --
+        // Nose
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(10, 0, 3, 0, Math.PI*2);
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle = 'black';
+        ctx.beginPath(); ctx.arc(4, -5, 2, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(4, 5, 2, 0, Math.PI*2); ctx.fill();
+
+        // -- Held Ball --
+        if (hasBall) {
+            ctx.save();
+            // Position ball in mouth area
+            drawTennisBall(12, 0);
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+
+    // --- Setup ---
+
+    function initGame() {
+        score = 0;
+        scoreEl.innerText = score;
+        winston.hasBall = false;
+        winston.x = width/2;
+        winston.y = height/2 + 100;
+        bucket.x = width/2;
+        bucket.y = height/4;
+        balls = [];
+
+        // Spawn balls randomly, avoiding the bucket area slightly
+        for(let i=0; i<totalBalls; i++) {
+            let bX, bY, dist;
+            do {
+                bX = Math.random() * (width - 40) + 20;
+                bY = Math.random() * (height - 40) + 20;
+                dist = Math.hypot(bX - bucket.x, bY - bucket.y);
+            } while(dist < 100); // Ensure balls don't spawn right on top of bucket
+
+            balls.push({ x: bX, y: bY, active: true });
+        }
+    }
+
+    function startGame() {
+        startScreen.classList.add('hidden');
+        winScreen.classList.add('hidden');
+        initGame();
+        gameActive = true;
+        requestAnimationFrame(loop);
+    }
+
+    function resetGame() {
+        winScreen.classList.add('hidden');
+        startGame();
+    }
+
+    // --- Input Handlers ---
+
+    window.addEventListener('keydown', e => {
+        if(keys.hasOwnProperty(e.key)) keys[e.key] = true;
+    });
+    window.addEventListener('keyup', e => {
+        if(keys.hasOwnProperty(e.key)) keys[e.key] = false;
+    });
+
+    // Touch handlers
+    canvas.addEventListener('touchstart', e => {
+        touchInput.active = true;
+        updateTouch(e);
+    });
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault(); // Stop scrolling
+        updateTouch(e);
+    });
+    canvas.addEventListener('touchend', () => {
+        touchInput.active = false;
+    });
+
+    function updateTouch(e) {
+        const touch = e.touches[0];
+        touchInput.x = touch.clientX;
+        touchInput.y = touch.clientY;
+    }
+
+    // --- Physics & Logic ---
+
+    function update(dt) {
+        if(!gameActive) return;
+
+        let dx = 0;
+        let dy = 0;
+
+        // Keyboard Movement
+        if (keys.w || keys.ArrowUp) dy = -1;
+        if (keys.s || keys.ArrowDown) dy = 1;
+        if (keys.a || keys.ArrowLeft) dx = -1;
+        if (keys.d || keys.ArrowRight) dx = 1;
+
+        // Touch Movement (Move towards finger)
+        if (touchInput.active) {
+            const angleToTouch = Math.atan2(touchInput.y - winston.y, touchInput.x - winston.x);
+            const distToTouch = Math.hypot(touchInput.x - winston.x, touchInput.y - winston.y);
+            
+            if(distToTouch > 10) { // Deadzone
+                dx = Math.cos(angleToTouch);
+                dy = Math.sin(angleToTouch);
+            }
+        }
+
+        // Normalize vector
+        if (dx !== 0 || dy !== 0) {
+            const length = Math.hypot(dx, dy);
+            dx /= length;
+            dy /= length;
+            
+            winston.x += dx * winston.speed;
+            winston.y += dy * winston.speed;
+
+            // Rotate Winston to face direction of movement
+            // Smooth rotation
+            const targetAngle = Math.atan2(dy, dx);
+            // Simple approach: just set it for now, can lerp for smoother
+            winston.angle = targetAngle;
+        }
+
+        // Boundary checks
+        winston.x = Math.max(20, Math.min(width - 20, winston.x));
+        winston.y = Math.max(20, Math.min(height - 20, winston.y));
+
+        // Ball Collision
+        if (!winston.hasBall) {
+            balls.forEach(ball => {
+                if (ball.active) {
+                    const dist = Math.hypot(winston.x - ball.x, winston.y - ball.y);
+                    if (dist < 30) {
+                        ball.active = false;
+                        winston.hasBall = true;
+                        // Optional: Play a short sound here if possible
+                    }
+                }
+            });
+        }
+
+        // Bucket Collision
+        const distToBucket = Math.hypot(winston.x - bucket.x, winston.y - bucket.y);
+        if (distToBucket < 50 && winston.hasBall) {
+            winston.hasBall = false;
+            score++;
+            scoreEl.innerText = score;
+            triggerConfetti(bucket.x, bucket.y);
+
+            if (score >= totalBalls) {
+                gameActive = false;
+                setTimeout(() => {
+                    winScreen.classList.remove('hidden');
+                    startConfettiShower();
+                }, 500);
+            }
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // 1. Bucket (drawn first so it's behind Winston if he overlaps top slightly, but balls inside are hidden?)
+        // Actually, bucket should be on ground.
+        drawBucket(bucket.x, bucket.y);
+
+        // 2. Balls on ground
+        balls.forEach(ball => {
+            if (ball.active) drawTennisBall(ball.x, ball.y);
+        });
+
+        // 3. Winston
+        drawWinston(winston.x, winston.y, winston.angle, winston.hasBall);
+    }
+
+    function loop() {
+        update();
+        draw();
+        if (gameActive) requestAnimationFrame(loop);
+    }
+
+    // --- Confetti System ---
+    let particles = [];
+
+    function triggerConfetti(x, y) {
+        for(let i=0; i<20; i++) {
+            particles.push({
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 1) * 10,
+                color: `hsl(${Math.random()*360}, 100%, 50%)`,
+                life: 1.0,
+                decay: 0.02
+            });
+        }
+        if (!confettiLoopActive) requestAnimationFrame(updateConfetti);
+    }
+
+    function startConfettiShower() {
+        for(let i=0; i<100; i++) {
+            particles.push({
+                x: Math.random() * width,
+                y: -10,
+                vx: (Math.random() - 0.5) * 5,
+                vy: Math.random() * 5 + 2,
+                color: `hsl(${Math.random()*360}, 100%, 50%)`,
+                life: 2.0,
+                decay: 0.005
+            });
+        }
+        if (!confettiLoopActive) requestAnimationFrame(updateConfetti);
+    }
+
+    let confettiLoopActive = false;
+
+    function updateConfetti() {
+        confettiCtx.clearRect(0, 0, width, height);
+        
+        particles.forEach((p, index) => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.2; // Gravity
+            p.life -= p.decay;
+            
+            confettiCtx.fillStyle = p.color;
+            confettiCtx.globalAlpha = p.life;
+            confettiCtx.fillRect(p.x, p.y, 6, 6);
+        });
+
+        particles = particles.filter(p => p.life > 0);
+
+        if (particles.length > 0) {
+            confettiLoopActive = true;
+            requestAnimationFrame(updateConfetti);
+        } else {
+            confettiLoopActive = false;
+        }
+    }
+
+    // Initial render for background
+    resize();
+    ctx.fillStyle = '#7EC850';
+    ctx.fillRect(0,0,width,height);
+    // Draw initial state (game paused)
+    // drawBucket(bucket.x, bucket.y);
+
+</script>
+</body>
+</html>
